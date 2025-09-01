@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PageCompare</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+        }
+        
+        .topbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 0 20px;
+            z-index: 1000;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .topbar input[type="file"] {
+            flex: 1;
+            height: 36px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            color: #fff;
+            padding: 0;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        
+        .topbar input[type="text"] {
+            flex: 1;
+            height: 36px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            color: #fff;
+            padding: 0 12px;
+            font-size: 14px;
+        }
+        
+        .topbar input[type="text"]::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .topbar input[type="file"]::file-selector-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin: 4px 8px 4px 4px;
+            cursor: pointer;
+            font-size: 14px;
+            height: 28px;
+        }
+        
+        .topbar input[type="file"]::file-selector-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .topbar input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .topbar input[type="text"]:focus {
+            outline: none;
+            border-color: #007aff;
+            box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2);
+        }
+        
+        .topbar input[type="file"]:focus {
+            outline: none;
+            border-color: #007aff;
+            box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2);
+        }
+        
+        .topbar button {
+            height: 36px;
+            padding: 0 16px;
+            background: #007aff;
+            border: none;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .topbar button:hover {
+            background: #0051d0;
+        }
+        
+        .topbar button:disabled {
+            background: rgba(255, 255, 255, 0.2);
+            cursor: not-allowed;
+        }
+        
+        .container {
+            position: absolute;
+            top: 60px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: auto;
+        }
+        
+        .split-view {
+            position: relative;
+            width: 100%;
+            min-height: 100%;
+        }
+        
+        .panel {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            min-height: 100%;
+        }
+        
+        .panel-left {
+            clip-path: polygon(0 0, 50% 0, 50% 100%, 0 100%);
+        }
+        
+        .panel-right {
+            clip-path: polygon(50% 0, 100% 0, 100% 100%, 50% 100%);
+        }
+        
+        .panel img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        
+        .placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 18px;
+        }
+        
+        .slider {
+            position: fixed;
+            top: 60px;
+            left: 50%;
+            width: 4px;
+            bottom: 0;
+            background: #007aff;
+            cursor: ew-resize;
+            z-index: 100;
+            transform: translateX(-50%);
+        }
+        
+        .slider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            background: #007aff;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 24px;
+            height: 24px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid #007aff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .dropdown-btn {
+            height: 36px;
+            padding: 0 16px;
+            background: #007aff;
+            border: none;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .dropdown-btn:hover {
+            background: #0051d0;
+        }
+        
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            min-width: 180px;
+            white-space: nowrap;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            margin-top: 4px;
+        }
+        
+        .dropdown-content.show {
+            display: block;
+        }
+        
+        .dropdown-content button {
+            display: block;
+            width: 100%;
+            padding: 8px 16px;
+            background: none;
+            border: none;
+            color: #fff;
+            text-align: left;
+            cursor: pointer;
+            font-size: 14px;
+            border-radius: 4px;
+            margin: 2px;
+        }
+        
+        .dropdown-content button:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .dropdown-content button:disabled {
+            color: rgba(255, 255, 255, 0.4);
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <input type="file" id="leftFile" accept="image/*" placeholder="Select first image">
+        <input type="file" id="rightFile" accept="image/*" placeholder="Select second image">
+        <button id="compareBtn" onclick="compare()">Compare</button>
+        <div class="dropdown">
+            <button class="dropdown-btn" onclick="toggleDropdown()">☰</button>
+            <div class="dropdown-content" id="dropdownContent">
+                <button id="saveBtn" onclick="saveComparison()" disabled>Save Comparison</button>
+                <button id="loadBtn" onclick="showLoadMenu()">Load Comparison</button>
+                <button id="removeBtn" onclick="showRemoveMenu()">Remove Comparison</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="split-view" id="splitView">
+            <div class="panel panel-left" id="leftPanel">
+                <div class="placeholder">Select images and click Compare</div>
+            </div>
+            <div class="panel panel-right" id="rightPanel">
+                <div class="placeholder">Select images and click Compare</div>
+            </div>
+            <div class="slider" id="slider"></div>
+        </div>
+    </div>
+
+    <script>
+        let isDragging = false;
+        let currentPosition = 50;
+        
+        const slider = document.getElementById('slider');
+        const leftPanel = document.getElementById('leftPanel');
+        const rightPanel = document.getElementById('rightPanel');
+        const splitView = document.getElementById('splitView');
+        
+        // Slider functionality
+        slider.addEventListener('mousedown', startDrag);
+        document.addEventListener('mousemove', drag);
+        document.addEventListener('mouseup', endDrag);
+        
+        function startDrag(e) {
+            isDragging = true;
+            document.body.style.cursor = 'ew-resize';
+            e.preventDefault();
+        }
+        
+        function drag(e) {
+            if (!isDragging) return;
+            
+            const containerRect = document.querySelector('.container').getBoundingClientRect();
+            const x = e.clientX - containerRect.left;
+            const percentage = Math.max(10, Math.min(90, (x / containerRect.width) * 100));
+            
+            updateSlider(percentage);
+        }
+        
+        function endDrag() {
+            isDragging = false;
+            document.body.style.cursor = '';
+        }
+        
+        function updateSlider(percentage) {
+            currentPosition = percentage;
+            slider.style.left = percentage + '%';
+            leftPanel.style.clipPath = `polygon(0 0, ${percentage}% 0, ${percentage}% 100%, 0 100%)`;
+            rightPanel.style.clipPath = `polygon(${percentage}% 0, 100% 0, 100% 100%, ${percentage}% 100%)`;
+        }
+        
+        // Global variables for current comparison
+        let currentComparison = null;
+        let fileCache = new Map(); // Cache for file objects
+        
+        // URL Hash management
+        function updateURLHash() {
+            if (currentComparison) {
+                const hashParams = new URLSearchParams();
+                hashParams.set('left', currentComparison.leftPath);
+                hashParams.set('right', currentComparison.rightPath);
+                if (currentComparison.savedId) {
+                    hashParams.set('saved', currentComparison.savedId);
+                }
+                window.location.hash = hashParams.toString();
+            }
+        }
+        
+        function loadFromURLHash() {
+            const hash = window.location.hash.substring(1);
+            console.log('Hash:', hash);
+            if (!hash) return;
+            
+            const params = new URLSearchParams(hash);
+            const leftPath = params.get('left');
+            const rightPath = params.get('right');
+            const savedId = params.get('saved');
+            
+            console.log('URL params:', { leftPath, rightPath, savedId });
+            
+            if (leftPath && rightPath) {
+                // Check if we have cached files
+                const leftFile = fileCache.get(leftPath);
+                const rightFile = fileCache.get(rightPath);
+                
+                console.log('Cached files:', { leftFile: !!leftFile, rightFile: !!rightFile });
+                
+                if (leftFile && rightFile) {
+                    // Auto compare if files are cached
+                    console.log('Auto-loading cached files');
+                    loadCachedFiles(leftFile, rightFile, savedId);
+                } else {
+                    // Show message about which files to select
+                    console.log('Showing files needed message');
+                    if (savedId) {
+                        const savedComparisons = JSON.parse(localStorage.getItem('savedComparisons') || '[]');
+                        const saved = savedComparisons.find(comp => comp.id === savedId);
+                        if (saved) {
+                            showFilesNeeded(`Restore comparison: ${saved.name}`, leftPath, rightPath);
+                        } else {
+                            showFilesNeeded('Restore comparison', leftPath, rightPath);
+                        }
+                    } else {
+                        showFilesNeeded('Resume comparison', leftPath, rightPath);
+                    }
+                }
+            }
+        }
+        
+        function loadCachedFiles(leftFile, rightFile, savedId = null) {
+            try {
+                const leftUrl = URL.createObjectURL(leftFile);
+                const rightUrl = URL.createObjectURL(rightFile);
+                
+                currentComparison = {
+                    leftPath: leftFile.name,
+                    rightPath: rightFile.name,
+                    leftUrl: leftUrl,
+                    rightUrl: rightUrl,
+                    savedId: savedId
+                };
+                
+                displayImages(leftUrl, rightUrl, leftFile.name, rightFile.name);
+                updateSplitViewHeight();
+                document.getElementById('saveBtn').disabled = false;
+            } catch (error) {
+                console.error('Error loading cached files:', error);
+            }
+        }
+        
+        function showFilesNeeded(title, leftPath, rightPath) {
+            leftPanel.innerHTML = `<div class="placeholder">${title}<br><br>Left: ${leftPath}<br>Right: ${rightPath}<br><br>Select the files above to continue</div>`;
+            rightPanel.innerHTML = `<div class="placeholder">${title}<br><br>Left: ${leftPath}<br>Right: ${rightPath}<br><br>Select the files above to continue</div>`;
+        }
+        
+        // Compare functionality
+        function compare() {
+            const leftFile = document.getElementById('leftFile').files[0];
+            const rightFile = document.getElementById('rightFile').files[0];
+            const compareBtn = document.getElementById('compareBtn');
+            const saveBtn = document.getElementById('saveBtn');
+            
+            if (!leftFile || !rightFile) {
+                alert('Please select both images');
+                return;
+            }
+            
+            // Cache the files
+            fileCache.set(leftFile.name, leftFile);
+            fileCache.set(rightFile.name, rightFile);
+            
+            compareBtn.disabled = true;
+            compareBtn.textContent = 'Loading...';
+            
+            showLoading();
+            
+            try {
+                const leftUrl = URL.createObjectURL(leftFile);
+                const rightUrl = URL.createObjectURL(rightFile);
+                
+                currentComparison = {
+                    leftPath: leftFile.name,
+                    rightPath: rightFile.name,
+                    leftUrl: leftUrl,
+                    rightUrl: rightUrl
+                };
+                
+                displayImages(leftUrl, rightUrl, leftFile.name, rightFile.name);
+                updateSplitViewHeight();
+                updateURLHash();
+                saveBtn.disabled = false;
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Failed to load images');
+            } finally {
+                compareBtn.disabled = false;
+                compareBtn.textContent = 'Compare';
+            }
+        }
+        
+        function showLoading() {
+            leftPanel.innerHTML = '<div class="loading"></div>';
+            rightPanel.innerHTML = '<div class="loading"></div>';
+        }
+        
+        function displayImages(leftSrc, rightSrc, leftName = '', rightName = '') {
+            leftPanel.innerHTML = `<img src="${leftSrc}" alt="${leftName || 'Left image'}">`;
+            rightPanel.innerHTML = `<img src="${rightSrc}" alt="${rightName || 'Right image'}">`;
+        }
+        
+        function showError(message) {
+            leftPanel.innerHTML = `<div class="placeholder">${message}</div>`;
+            rightPanel.innerHTML = `<div class="placeholder">${message}</div>`;
+        }
+        
+        // Save comparison functionality
+        function saveComparison() {
+            if (!currentComparison) {
+                alert('No comparison to save');
+                return;
+            }
+            
+            const defaultName = `${currentComparison.leftPath} vs ${currentComparison.rightPath}`;
+            const name = prompt('Enter a name for this comparison:', defaultName);
+            
+            if (name === null) return; // User cancelled
+            
+            const finalName = name.trim() || defaultName;
+            
+            const savedComparisons = JSON.parse(localStorage.getItem('savedComparisons') || '[]');
+            const comparison = {
+                id: Date.now().toString(),
+                name: finalName,
+                leftPath: currentComparison.leftPath,
+                rightPath: currentComparison.rightPath,
+                timestamp: new Date().toISOString()
+            };
+            
+            savedComparisons.push(comparison);
+            localStorage.setItem('savedComparisons', JSON.stringify(savedComparisons));
+            
+            alert('Comparison saved successfully!');
+            toggleDropdown();
+        }
+        
+        // Load menu functionality
+        function showLoadMenu() {
+            const savedComparisons = JSON.parse(localStorage.getItem('savedComparisons') || '[]');
+            
+            if (savedComparisons.length === 0) {
+                alert('No saved comparisons found');
+                return;
+            }
+            
+            let menu = 'Saved Comparisons:\n\n';
+            savedComparisons.forEach((comp, index) => {
+                const date = new Date(comp.timestamp).toLocaleDateString();
+                menu += `${index + 1}. ${comp.name} (${date})\n`;
+            });
+            menu += '\nEnter number to load (or 0 to cancel):';
+            
+            const choice = prompt(menu);
+            const index = parseInt(choice) - 1;
+            
+            if (choice === '0' || choice === null) return;
+            
+            if (index >= 0 && index < savedComparisons.length) {
+                loadComparison(savedComparisons[index]);
+            } else {
+                alert('Invalid selection');
+            }
+        }
+        
+        function loadComparison(comparison) {
+            // Update URL hash with saved comparison
+            const hashParams = new URLSearchParams();
+            hashParams.set('left', comparison.leftPath);
+            hashParams.set('right', comparison.rightPath);
+            hashParams.set('saved', comparison.id);
+            window.location.hash = hashParams.toString();
+            
+            alert(`Loading comparison: ${comparison.name}\nLeft: ${comparison.leftPath}\nRight: ${comparison.rightPath}\n\nPlease select the corresponding files to view the comparison.`);
+            toggleDropdown();
+        }
+        
+        // Remove comparison functionality
+        function showRemoveMenu() {
+            const savedComparisons = JSON.parse(localStorage.getItem('savedComparisons') || '[]');
+            
+            if (savedComparisons.length === 0) {
+                alert('No saved comparisons found');
+                toggleDropdown();
+                return;
+            }
+            
+            let menu = 'Remove Comparison:\n\n';
+            savedComparisons.forEach((comp, index) => {
+                const date = new Date(comp.timestamp).toLocaleDateString();
+                menu += `${index + 1}. ${comp.name} (${date})\n`;
+            });
+            menu += '\nEnter number to remove (or 0 to cancel):';
+            
+            const choice = prompt(menu);
+            const index = parseInt(choice) - 1;
+            
+            if (choice === '0' || choice === null) {
+                toggleDropdown();
+                return;
+            }
+            
+            if (index >= 0 && index < savedComparisons.length) {
+                const compToRemove = savedComparisons[index];
+                const confirm = window.confirm(`Are you sure you want to remove "${compToRemove.name}"?`);
+                
+                if (confirm) {
+                    savedComparisons.splice(index, 1);
+                    localStorage.setItem('savedComparisons', JSON.stringify(savedComparisons));
+                    alert('Comparison removed successfully!');
+                }
+            } else {
+                alert('Invalid selection');
+            }
+            
+            toggleDropdown();
+        }
+        
+        function toggleDropdown() {
+            document.getElementById('dropdownContent').classList.toggle('show');
+        }
+        
+        function updateSplitViewHeight() {
+            setTimeout(() => {
+                const leftImg = leftPanel.querySelector('img');
+                const rightImg = rightPanel.querySelector('img');
+                
+                if (leftImg && rightImg) {
+                    const maxHeight = Math.max(leftImg.naturalHeight * (window.innerWidth / leftImg.naturalWidth), 
+                                             rightImg.naturalHeight * (window.innerWidth / rightImg.naturalWidth));
+                    
+                    splitView.style.height = maxHeight + 'px';
+                }
+            }, 100);
+        }
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            updateSlider(currentPosition);
+            updateSplitViewHeight();
+        });
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadFromURLHash();
+        });
+        
+        // Handle hash changes
+        window.addEventListener('hashchange', () => {
+            loadFromURLHash();
+        });
+        
+        // Handle file input changes
+        document.getElementById('leftFile').addEventListener('change', (e) => {
+            if (e.target.files[0]) {
+                fileCache.set(e.target.files[0].name, e.target.files[0]);
+                checkAutoCompare();
+            }
+        });
+        
+        document.getElementById('rightFile').addEventListener('change', (e) => {
+            if (e.target.files[0]) {
+                fileCache.set(e.target.files[0].name, e.target.files[0]);
+                checkAutoCompare();
+            }
+        });
+        
+        function checkAutoCompare() {
+            const hash = window.location.hash.substring(1);
+            if (!hash) return;
+            
+            const params = new URLSearchParams(hash);
+            const leftPath = params.get('left');
+            const rightPath = params.get('right');
+            
+            if (leftPath && rightPath) {
+                const leftFileInput = document.getElementById('leftFile');
+                const rightFileInput = document.getElementById('rightFile');
+                
+                const leftFile = leftFileInput.files[0];
+                const rightFile = rightFileInput.files[0];
+                
+                // Check if selected files match the URL paths
+                if (leftFile && rightFile && 
+                    leftFile.name === leftPath && 
+                    rightFile.name === rightPath) {
+                    // Auto compare when both correct files are selected
+                    setTimeout(() => {
+                        compare();
+                    }, 100);
+                }
+            }
+        }
+        
+        // Close dropdown when clicking outside
+        window.addEventListener('click', function(event) {
+            if (!event.target.matches('.dropdown-btn') && !event.target.closest('.dropdown')) {
+                const dropdowns = document.getElementsByClassName('dropdown-content');
+                for (let i = 0; i < dropdowns.length; i++) {
+                    dropdowns[i].classList.remove('show');
+                }
+            }
+        });
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                compare();
+            }
+            if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                saveComparison();
+            }
+        });
+    </script>
+</body>
+</html>
