@@ -172,19 +172,6 @@
             transform: translateX(-50%);
         }
         
-        .slider::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 20px;
-            height: 20px;
-            background: #007aff;
-            border: 2px solid #fff;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-        }
-        
         .loading {
             position: absolute;
             top: 50%;
@@ -337,9 +324,12 @@
         function drag(e) {
             if (!isDragging) return;
             
-            const containerRect = document.querySelector('.container').getBoundingClientRect();
+            const container = document.querySelector('.container');
+            const containerRect = container.getBoundingClientRect();
             const x = e.clientX - containerRect.left;
-            const percentage = Math.max(10, Math.min(90, (x / containerRect.width) * 100));
+            
+            // Use clientWidth to exclude scrollbar width
+            const percentage = Math.max(10, Math.min(90, (x / container.clientWidth) * 100));
             
             updateSlider(percentage);
         }
@@ -358,86 +348,74 @@
         
         // Global variables for current comparison
         let currentComparison = null;
-        let fileCache = new Map(); // Cache for file objects
         
         // URL Hash management
-        function updateURLHash() {
-            if (currentComparison) {
-                const hashParams = new URLSearchParams();
-                hashParams.set('left', currentComparison.leftPath);
-                hashParams.set('right', currentComparison.rightPath);
-                if (currentComparison.savedId) {
-                    hashParams.set('saved', currentComparison.savedId);
-                }
-                window.location.hash = hashParams.toString();
+        function updateURLHash(comparisonId = null) {
+            if (comparisonId) {
+                window.location.hash = `comparison=${comparisonId}`;
+            } else {
+                window.location.hash = '';
             }
         }
         
         function loadFromURLHash() {
             const hash = window.location.hash.substring(1);
-            console.log('Hash:', hash);
             if (!hash) return;
             
             const params = new URLSearchParams(hash);
-            const leftPath = params.get('left');
-            const rightPath = params.get('right');
-            const savedId = params.get('saved');
+            const comparisonId = params.get('comparison');
             
-            console.log('URL params:', { leftPath, rightPath, savedId });
-            
-            if (leftPath && rightPath) {
-                // Check if we have cached files
-                const leftFile = fileCache.get(leftPath);
-                const rightFile = fileCache.get(rightPath);
+            if (comparisonId) {
+                const savedComparisons = JSON.parse(localStorage.getItem('savedComparisons') || '[]');
+                const saved = savedComparisons.find(comp => comp.id === comparisonId);
                 
-                console.log('Cached files:', { leftFile: !!leftFile, rightFile: !!rightFile });
-                
-                if (leftFile && rightFile) {
-                    // Auto compare if files are cached
-                    console.log('Auto-loading cached files');
-                    loadCachedFiles(leftFile, rightFile, savedId);
-                } else {
-                    // Show message about which files to select
-                    console.log('Showing files needed message');
-                    if (savedId) {
-                        const savedComparisons = JSON.parse(localStorage.getItem('savedComparisons') || '[]');
-                        const saved = savedComparisons.find(comp => comp.id === savedId);
-                        if (saved) {
-                            showFilesNeeded(`Restore comparison: ${saved.name}`, leftPath, rightPath);
-                        } else {
-                            showFilesNeeded('Restore comparison', leftPath, rightPath);
-                        }
-                    } else {
-                        showFilesNeeded('Resume comparison', leftPath, rightPath);
-                    }
+                if (saved && saved.leftData && saved.rightData) {
+                    // Auto-load comparison from localStorage
+                    loadSavedComparison(saved);
                 }
             }
         }
         
-        function loadCachedFiles(leftFile, rightFile, savedId = null) {
+        function loadSavedComparison(saved) {
             try {
-                const leftUrl = URL.createObjectURL(leftFile);
-                const rightUrl = URL.createObjectURL(rightFile);
+                // Convert base64 back to blob URLs
+                const leftBlob = base64ToBlob(saved.leftData);
+                const rightBlob = base64ToBlob(saved.rightData);
+                
+                const leftUrl = URL.createObjectURL(leftBlob);
+                const rightUrl = URL.createObjectURL(rightBlob);
                 
                 currentComparison = {
-                    leftPath: leftFile.name,
-                    rightPath: rightFile.name,
+                    leftPath: saved.leftPath,
+                    rightPath: saved.rightPath,
                     leftUrl: leftUrl,
                     rightUrl: rightUrl,
-                    savedId: savedId
+                    savedId: saved.id
                 };
                 
-                displayImages(leftUrl, rightUrl, leftFile.name, rightFile.name);
+                displayImages(leftUrl, rightUrl, saved.leftPath, saved.rightPath);
                 updateSplitViewHeight();
                 document.getElementById('saveBtn').disabled = false;
             } catch (error) {
-                console.error('Error loading cached files:', error);
+                console.error('Error loading saved comparison:', error);
+                showError('Failed to load saved comparison');
             }
         }
         
+        function base64ToBlob(base64Data) {
+            const byteCharacters = atob(base64Data.split(',')[1]);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            return new Blob([byteArray], {type: 'image/png'});
+        }
+        
+        
         function showFilesNeeded(title, leftPath, rightPath) {
-            leftPanel.innerHTML = `<div class="placeholder">${title}<br><br>Left: ${leftPath}<br>Right: ${rightPath}<br><br>Select the files above to continue</div>`;
-            rightPanel.innerHTML = `<div class="placeholder">${title}<br><br>Left: ${leftPath}<br>Right: ${rightPath}<br><br>Select the files above to continue</div>`;
+            leftPanel.innerHTML = `<div class="placeholder">${title}<br><br>Waiting for:<br>${leftPath}<br>+<br>${rightPath}</div>`;
+            rightPanel.innerHTML = `<div class="placeholder">${title}<br><br>Waiting for:<br>${leftPath}<br>+<br>${rightPath}</div>`;
         }
         
         // Compare functionality
@@ -452,9 +430,6 @@
                 return;
             }
             
-            // Cache the files
-            fileCache.set(leftFile.name, leftFile);
-            fileCache.set(rightFile.name, rightFile);
             
             compareBtn.disabled = true;
             compareBtn.textContent = 'Loading...';
@@ -474,7 +449,6 @@
                 
                 displayImages(leftUrl, rightUrl, leftFile.name, rightFile.name);
                 updateSplitViewHeight();
-                updateURLHash();
                 saveBtn.disabled = false;
             } catch (error) {
                 console.error('Error:', error);
@@ -501,7 +475,7 @@
         }
         
         // Save comparison functionality
-        function saveComparison() {
+        async function saveComparison() {
             if (!currentComparison) {
                 alert('No comparison to save');
                 return;
@@ -514,20 +488,53 @@
             
             const finalName = name.trim() || defaultName;
             
-            const savedComparisons = JSON.parse(localStorage.getItem('savedComparisons') || '[]');
-            const comparison = {
-                id: Date.now().toString(),
-                name: finalName,
-                leftPath: currentComparison.leftPath,
-                rightPath: currentComparison.rightPath,
-                timestamp: new Date().toISOString()
-            };
-            
-            savedComparisons.push(comparison);
-            localStorage.setItem('savedComparisons', JSON.stringify(savedComparisons));
-            
-            alert('Comparison saved successfully!');
-            toggleDropdown();
+            try {
+                // Convert images to base64
+                const leftData = await imageToBase64(currentComparison.leftUrl);
+                const rightData = await imageToBase64(currentComparison.rightUrl);
+                
+                const savedComparisons = JSON.parse(localStorage.getItem('savedComparisons') || '[]');
+                const comparison = {
+                    id: Date.now().toString(),
+                    name: finalName,
+                    leftPath: currentComparison.leftPath,
+                    rightPath: currentComparison.rightPath,
+                    leftData: leftData,
+                    rightData: rightData,
+                    timestamp: new Date().toISOString()
+                };
+                
+                savedComparisons.push(comparison);
+                localStorage.setItem('savedComparisons', JSON.stringify(savedComparisons));
+                
+                // Update URL with comparison ID
+                updateURLHash(comparison.id);
+                currentComparison.savedId = comparison.id;
+                
+                alert('Comparison saved successfully!');
+                toggleDropdown();
+            } catch (error) {
+                console.error('Error saving comparison:', error);
+                alert('Failed to save comparison');
+                toggleDropdown();
+            }
+        }
+        
+        function imageToBase64(imageUrl) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    resolve(canvas.toDataURL('image/png'));
+                };
+                img.onerror = reject;
+                img.src = imageUrl;
+            });
         }
         
         // Load menu functionality
@@ -559,14 +566,9 @@
         }
         
         function loadComparison(comparison) {
-            // Update URL hash with saved comparison
-            const hashParams = new URLSearchParams();
-            hashParams.set('left', comparison.leftPath);
-            hashParams.set('right', comparison.rightPath);
-            hashParams.set('saved', comparison.id);
-            window.location.hash = hashParams.toString();
-            
-            alert(`Loading comparison: ${comparison.name}\nLeft: ${comparison.leftPath}\nRight: ${comparison.rightPath}\n\nPlease select the corresponding files to view the comparison.`);
+            // Update URL and load comparison directly
+            updateURLHash(comparison.id);
+            loadSavedComparison(comparison);
             toggleDropdown();
         }
         
@@ -598,9 +600,6 @@
                 leftInput.files = leftTransfer.files;
                 rightInput.files = rightTransfer.files;
                 
-                // Update cache
-                if (leftTransfer.files[0]) fileCache.set(leftTransfer.files[0].name, leftTransfer.files[0]);
-                if (rightTransfer.files[0]) fileCache.set(rightTransfer.files[0].name, rightTransfer.files[0]);
                 
                 // If comparison is active, swap and recompare
                 if (currentComparison) {
@@ -689,42 +688,31 @@
         // Handle file input changes
         document.getElementById('leftFile').addEventListener('change', (e) => {
             if (e.target.files[0]) {
-                fileCache.set(e.target.files[0].name, e.target.files[0]);
                 checkAutoCompare();
             }
         });
         
         document.getElementById('rightFile').addEventListener('change', (e) => {
             if (e.target.files[0]) {
-                fileCache.set(e.target.files[0].name, e.target.files[0]);
                 checkAutoCompare();
             }
         });
         
         function checkAutoCompare() {
-            const hash = window.location.hash.substring(1);
-            if (!hash) return;
+            // Only auto-compare if we don't have a saved comparison loaded
+            if (currentComparison && currentComparison.savedId) return;
             
-            const params = new URLSearchParams(hash);
-            const leftPath = params.get('left');
-            const rightPath = params.get('right');
+            const leftFileInput = document.getElementById('leftFile');
+            const rightFileInput = document.getElementById('rightFile');
             
-            if (leftPath && rightPath) {
-                const leftFileInput = document.getElementById('leftFile');
-                const rightFileInput = document.getElementById('rightFile');
-                
-                const leftFile = leftFileInput.files[0];
-                const rightFile = rightFileInput.files[0];
-                
-                // Check if selected files match the URL paths
-                if (leftFile && rightFile && 
-                    leftFile.name === leftPath && 
-                    rightFile.name === rightPath) {
-                    // Auto compare when both correct files are selected
-                    setTimeout(() => {
-                        compare();
-                    }, 100);
-                }
+            const leftFile = leftFileInput.files[0];
+            const rightFile = rightFileInput.files[0];
+            
+            // Auto compare when both files are selected
+            if (leftFile && rightFile) {
+                setTimeout(() => {
+                    compare();
+                }, 100);
             }
         }
         
