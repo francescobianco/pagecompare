@@ -265,11 +265,31 @@
             color: rgba(255, 255, 255, 0.4);
             cursor: not-allowed;
         }
+        
+        .swap-btn {
+            width: 36px;
+            height: 36px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .swap-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
     </style>
 </head>
 <body>
     <div class="topbar">
         <input type="file" id="leftFile" accept="image/*" placeholder="Select first image">
+        <button class="swap-btn" onclick="swapFiles()">⇄</button>
         <input type="file" id="rightFile" accept="image/*" placeholder="Select second image">
         <button id="compareBtn" onclick="compare()">Compare</button>
         <div class="dropdown">
@@ -548,6 +568,47 @@
             
             alert(`Loading comparison: ${comparison.name}\nLeft: ${comparison.leftPath}\nRight: ${comparison.rightPath}\n\nPlease select the corresponding files to view the comparison.`);
             toggleDropdown();
+        }
+        
+        // Swap files functionality
+        function swapFiles() {
+            const leftInput = document.getElementById('leftFile');
+            const rightInput = document.getElementById('rightFile');
+            
+            // Create new file lists
+            const leftFiles = leftInput.files;
+            const rightFiles = rightInput.files;
+            
+            if (leftFiles.length > 0 || rightFiles.length > 0) {
+                // Create new DataTransfer objects to swap files
+                const leftTransfer = new DataTransfer();
+                const rightTransfer = new DataTransfer();
+                
+                // Add right files to left input
+                for (let file of rightFiles) {
+                    leftTransfer.items.add(file);
+                }
+                
+                // Add left files to right input
+                for (let file of leftFiles) {
+                    rightTransfer.items.add(file);
+                }
+                
+                // Swap the files
+                leftInput.files = leftTransfer.files;
+                rightInput.files = rightTransfer.files;
+                
+                // Update cache
+                if (leftTransfer.files[0]) fileCache.set(leftTransfer.files[0].name, leftTransfer.files[0]);
+                if (rightTransfer.files[0]) fileCache.set(rightTransfer.files[0].name, rightTransfer.files[0]);
+                
+                // If comparison is active, swap and recompare
+                if (currentComparison) {
+                    compare();
+                }
+                
+                checkAutoCompare();
+            }
         }
         
         // Remove comparison functionality
