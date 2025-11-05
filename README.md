@@ -1,3 +1,24 @@
+# 🛑 **DEPRECATION NOTICE**
+
+```
+>>> STATUS: LEGACY MODE ACTIVATED
+>>> This repository has reached its final form.
+```
+
+A new and improved version of this project is now alive and kicking 🚀
+👉 **[Check out the successor here](https://github.com/francescobianco/tools.yafb.net/tree/main/page-compare)**
+
+Please switch to the new version to keep receiving updates, fixes, and shiny new features ✨
+
+```
+#include <legacy.h>
+void main() {
+    printf("Goodbye, old friend 👋");
+}
+```
+
+---
+
 quan
 Ti aiuto a creare un comparatore di pagine web con slider centrale! Quello che descrivi è simile a un "before/after slider" ma per pagine web intere.
 
